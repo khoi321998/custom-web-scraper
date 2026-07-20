@@ -1,0 +1,160 @@
+name: Build generic Actors
+
+on:
+    workflow_dispatch:
+        inputs:
+            web-scraper:
+                description: apify/web-scraper
+                type: boolean
+                required: false
+                default: true
+            cheerio-scraper:
+                description: apify/cheerio-scraper
+                type: boolean
+                required: false
+                default: true
+            playwright-scraper:
+                description: apify/playwright-scraper
+                type: boolean
+                required: false
+                default: true
+            puppeteer-scraper:
+                description: apify/puppeteer-scraper
+                type: boolean
+                required: false
+                default: true
+            jsdom-scraper:
+                description: apify/jsdom-scraper
+                type: boolean
+                required: false
+                default: true
+            camoufox-scraper:
+                description: apify/camoufox-scraper
+                type: boolean
+                required: false
+                default: true
+            sitemap-scraper:
+                description: apify/sitemap-extractor
+                type: boolean
+                required: false
+                default: true
+            build-channel:
+                description: Build channel
+                type: choice
+                required: true
+                options:
+                    - stable
+                    - development
+                    - custom
+                default: stable
+            version:
+                description: Custom version (only for custom build channel)
+                type: string
+                required: false
+            build-tag:
+                description: Custom build tag (only for custom build channel)
+                type: string
+                required: false
+
+jobs:
+    push-to-apify:
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                settings:
+                    - actor: web-scraper
+                      apify-actor: apify/web-scraper
+                      stable-version: '3.0'
+                      stable-build-tag: version-3
+                      development-version: '0.0'
+                      development-build-tag: development
+                      should-build: ${{ github.event.inputs.web-scraper }}
+                    - actor: cheerio-scraper
+                      apify-actor: apify/cheerio-scraper
+                      stable-version: '3.0'
+                      stable-build-tag: version-3
+                      development-version: '0.0'
+                      development-build-tag: development
+                      should-build: ${{ github.event.inputs.cheerio-scraper }}
+                    - actor: playwright-scraper
+                      apify-actor: apify/playwright-scraper
+                      stable-version: '1.0'
+                      stable-build-tag: version-1
+                      development-version: '0.0'
+                      development-build-tag: development
+                      should-build: ${{ github.event.inputs.playwright-scraper }}
+                    - actor: puppeteer-scraper
+                      apify-actor: apify/puppeteer-scraper
+                      stable-version: '3.0'
+                      stable-build-tag: version-3
+                      development-version: '0.0'
+                      development-build-tag: development
+                      should-build: ${{ github.event.inputs.puppeteer-scraper }}
+                    - actor: jsdom-scraper
+                      apify-actor: apify/jsdom-scraper
+                      stable-version: '0.2'
+                      stable-build-tag: version-0
+                      development-version: '0.0'
+                      development-build-tag: development
+                      should-build: ${{ github.event.inputs.jsdom-scraper }}
+                    - actor: camoufox-scraper
+                      apify-actor: apify/camoufox-scraper
+                      stable-version: '3.0'
+                      stable-build-tag: version-3
+                      development-version: '0.0'
+                      development-build-tag: development
+                      should-build: ${{ github.event.inputs.camoufox-scraper }}
+                    - actor: sitemap-scraper
+                      apify-actor: apify/sitemap-extractor
+                      stable-version: '0.1'
+                      stable-build-tag: latest
+                      development-version: '0.0'
+                      development-build-tag: development
+                      should-build: ${{ github.event.inputs.sitemap-scraper }}
+        steps:
+            - name: Check out current SHA
+              if: matrix.settings.should-build == 'true'
+              uses: actions/checkout@v7
+
+            - name: Set up Node.js
+              if: matrix.settings.should-build == 'true'
+              uses: actions/setup-node@v7
+              with:
+                  node-version: 24
+
+            - name: Install pnpm and dependencies
+              if: matrix.settings.should-build == 'true'
+              uses: apify/actions/pnpm-install@v1.4.0
+
+            - name: Log matrix
+              run: |
+                  echo "Actor: ${{ matrix.settings.actor }}"
+                  echo "Should build: ${{ matrix.settings.should-build }}"
+
+            - name: Calculate versions and tags
+              id: calculate-versions
+              if: matrix.settings.should-build == 'true'
+              run: |
+                  if [ "${{ github.event.inputs.build-channel }}" = "stable" ]; then
+                      echo "version=${{ matrix.settings.stable-version }}" >> "$GITHUB_ENV"
+                      echo "build-tag=${{ matrix.settings.stable-build-tag }}" >> "$GITHUB_ENV"
+                  elif [ "${{ github.event.inputs.build-channel }}" = "development" ]; then
+                      echo "version=${{ matrix.settings.development-version }}" >> "$GITHUB_ENV"
+                      echo "build-tag=${{ matrix.settings.development-build-tag }}" >> "$GITHUB_ENV"
+                  else
+                      echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_ENV"
+                      echo "build-tag=${{ github.event.inputs.build-tag }}" >> "$GITHUB_ENV"
+                  fi
+
+            - name: Build ${{ matrix.settings.actor }} on Apify (Git source)
+              if: matrix.settings.should-build == 'true'
+              env:
+                  APIFY_TOKEN: ${{ secrets.APIFY_ACTOR_BUILD_TOKEN }}
+                  APIFY_ACTOR: ${{ matrix.settings.apify-actor }}
+                  BUILD_VERSION: ${{ env.version }}
+                  BUILD_TAG: ${{ env.build-tag }}
+                  APIFY_RELEASE_BUILD_TIMEOUT_SECS: "900"
+              run: |
+                  set -euo pipefail
+                  node scripts/trigger-apify-build.mjs

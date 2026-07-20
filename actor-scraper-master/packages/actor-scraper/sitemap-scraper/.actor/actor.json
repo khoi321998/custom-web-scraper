@@ -1,0 +1,67 @@
+{
+    "actorSpecification": 1,
+    "name": "sitemap-extractor",
+    "version": "0.1",
+    "buildTag": "latest",
+    "dockerContextDir": "../../../..",
+    "dockerfile": "../Dockerfile",
+    "output": "./output_schema.json",
+    "defaultMemoryMbytes": 4096,
+    "minMemoryMbytes": 256,
+    "maxMemoryMbytes": 32768,
+    "storages": {
+        "dataset": {
+            "actorSpecification": 1,
+            "fields": {
+                "url": {
+                    "type": "string",
+                    "title": "URL",
+                    "description": "URL discovered in a sitemap."
+                },
+                "status": {
+                    "type": "integer",
+                    "title": "Status code",
+                    "description": "HTTP status code from the HEAD request."
+                },
+                "lastmod": {
+                    "type": ["string", "null"],
+                    "title": "Last modified",
+                    "description": "Last-modification time (ISO 8601) from the sitemap <lastmod> tag, falling back to the page's Last-Modified header. Null when neither is available."
+                },
+                "#error": {
+                    "type": "boolean",
+                    "title": "Error flag",
+                    "description": "True if the request failed after retries."
+                },
+                "#debug": {
+                    "type": "object",
+                    "title": "Debug info",
+                    "description": "Request debug info (id, retry count, errors, etc.)."
+                }
+            },
+            "views": {
+                "overview": {
+                    "title": "Overview",
+                    "transformation": {
+                        "fields": ["url", "status", "lastmod"]
+                    },
+                    "display": {
+                        "component": "table",
+                        "properties": {
+                            "url": {
+                                "label": "URL",
+                                "format": "link"
+                            },
+                            "status": {
+                                "label": "Status code"
+                            },
+                            "lastmod": {
+                                "label": "Last modified"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

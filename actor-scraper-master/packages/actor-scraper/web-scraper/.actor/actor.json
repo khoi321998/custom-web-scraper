@@ -1,0 +1,15 @@
+{
+    "actorSpecification": 1,
+    "name": "web-scraper",
+    "version": "0.1",
+    "buildTag": "latest",
+    "dockerContextDir": "../../../..",
+    "dockerfile": "../Dockerfile",
+    "storages": {
+        "dataset": {
+            "actorSpecification": 1,
+            "fields": {},
+            "views": {}
+        }
+    }
+}
