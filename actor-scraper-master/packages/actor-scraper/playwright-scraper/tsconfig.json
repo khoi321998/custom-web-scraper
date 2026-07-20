@@ -6,7 +6,8 @@
         "module": "ESNext",
         "moduleResolution": "bundler",
         "allowJs": true,
-        "skipLibCheck": true
+        "skipLibCheck": true,
+        "lib": ["ES2023", "DOM"]
     },
     "include": ["src"]
 }

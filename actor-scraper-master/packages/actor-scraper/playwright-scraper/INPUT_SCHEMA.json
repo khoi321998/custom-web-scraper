@@ -301,5 +301,5 @@
             "resourcePermissions": ["READ", "WRITE"]
         }
     },
-    "required": ["startUrls", "pageFunction", "proxyConfiguration"]
+    "required": ["startUrls", "proxyConfiguration"]
 }

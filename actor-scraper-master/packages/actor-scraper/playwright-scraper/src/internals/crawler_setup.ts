@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
-import { fileURLToPath, URL } from 'node:url';
+import { URL } from 'node:url';
 
 import type {
     AutoscaledPool,
@@ -25,6 +24,8 @@ import { browserTools, constants as scraperToolsConstants, createContext, tools 
 
 import type { Input } from './consts.js';
 import { ProxyRotation } from './consts.js';
+import { countryFromUrls } from './tld_country.js';
+import { pageFunction as builtinPageFunction } from './pageFunction.js';
 
 const SESSION_STORE_NAME = 'APIFY-PLAYWRIGHT-SCRAPER-SESSION-STORE';
 const REQUEST_QUEUE_INIT_FLAG_KEY = 'REQUEST_QUEUE_INITIALIZED';
@@ -70,9 +71,6 @@ export class CrawlerSetup implements CrawlerSetupOptions {
         // Keep this as string to be immutable.
         this.rawInput = JSON.stringify(input);
 
-        // Attempt to load page function from disk if not present on input.
-        tools.maybeLoadPageFunctionFromDisk(input, dirname(fileURLToPath(import.meta.url)));
-
         // Validate INPUT if not running on Apify Cloud Platform.
         if (!Actor.isAtHome()) tools.checkInputOrThrow(input, SCHEMA);
 
@@ -103,11 +101,34 @@ export class CrawlerSetup implements CrawlerSetupOptions {
             throw new Error('Navigation wait until event must be valid. See tooltip.');
         }
 
+        // Tier-1 proxy geo-targeting: if using Apify proxy without an explicit country, derive
+        // one from the start URLs' ccTLD (e.g. *.ua -> UA). Lands the first request on an
+        // in-country residential IP instead of wasting retries rotating random countries.
+        // Only auto-target countries we know the proxy pool covers well. Forcing a country with a
+        // thin/empty residential pool would fail where random rotation would have worked, so
+        // anything not in this allowlist falls back to random rotation. Add more codes as needed.
+        const AUTO_PROXY_COUNTRIES = new Set(['UA']);
+        const proxy = this.input.proxyConfiguration as { useApifyProxy?: boolean; apifyProxyCountry?: string };
+        if (proxy?.useApifyProxy && !proxy.apifyProxyCountry) {
+            const country = countryFromUrls(this.input.startUrls.map((req) => req.url).filter(Boolean) as string[]);
+            if (country && AUTO_PROXY_COUNTRIES.has(country)) {
+                proxy.apifyProxyCountry = country;
+                log.info(`Auto-selected proxy country "${country}" from start URL ccTLD.`);
+            } else if (country) {
+                log.info(`ccTLD country "${country}" not in auto-target allowlist; using random proxy rotation.`);
+            }
+        }
+
         // solving proxy rotation settings
         this.maxSessionUsageCount = SESSION_MAX_USAGE_COUNTS[this.input.proxyRotation];
 
-        // Functions need to be evaluated.
-        this.evaledPageFunction = tools.evalFunctionOrThrow(this.input.pageFunction);
+        // Functions need to be evaluated. Hybrid: if the input provides a pageFunction string,
+        // eval it (lets you override without rebuilding); otherwise use the built-in real TS
+        // pageFunction compiled into this actor.
+        const pageFunctionSource = this.input.pageFunction?.trim();
+        this.evaledPageFunction = pageFunctionSource
+            ? tools.evalFunctionOrThrow(pageFunctionSource)
+            : (builtinPageFunction as (...args: unknown[]) => unknown);
 
         if (this.input.preNavigationHooks) {
             this.evaledPreNavigationHooks = tools.evalFunctionArrayOrThrow(
@@ -149,7 +170,7 @@ export class CrawlerSetup implements CrawlerSetupOptions {
         }
 
         // Start Chromium with Debugger any time the page function includes the keyword.
-        this.devtools = this.input.pageFunction.includes('debugger;');
+        this.devtools = (this.input.pageFunction ?? '').includes('debugger;');
 
         // Named storages
         this.datasetName = this.input.datasetName;
