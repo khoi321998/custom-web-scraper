@@ -101,7 +101,7 @@ export class CrawlerSetup implements CrawlerSetupOptions {
         // Tier-1 proxy geo-targeting: if using Apify proxy without an explicit country, derive
         // one from the start URLs' ccTLD (e.g. *.ua -> UA). Only auto-target countries we know the
         // proxy pool covers well (allowlist); anything else falls back to random rotation.
-        const AUTO_PROXY_COUNTRIES = new Set(['UA']);
+        const AUTO_PROXY_COUNTRIES = new Set<string>([]); // TEMP: emptied to test random-country rotation (restore ['UA'])
         const proxy = this.input.proxyConfiguration as { useApifyProxy?: boolean; apifyProxyCountry?: string };
         if (proxy?.useApifyProxy && !proxy.apifyProxyCountry) {
             const country = countryFromUrls(this.input.startUrls.map((req) => req.url).filter(Boolean) as string[]);
